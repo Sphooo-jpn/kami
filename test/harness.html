@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>kami test harness</title>
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">紙<span class="brand-sub">kami</span></div>
+    <input id="docTitle" class="doc-title" type="text" value="無題のドキュメント" />
+    <div class="topbar-actions">
+      <button class="tb-btn" id="undoBtn" disabled>↺</button>
+      <button class="tb-btn" id="redoBtn" disabled>↻</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="newBtn">新規</button>
+      <button class="tb-btn" id="openBtn">開く</button>
+      <button class="tb-btn" id="saveBtn">保存</button>
+      <div class="menu-wrap">
+        <button class="tb-btn primary" id="exportBtn">PDF 書き出し ▾</button>
+        <div class="menu" id="exportMenu" hidden>
+          <button data-mode="auto">スマート</button>
+          <button data-mode="vector">ベクター</button>
+          <button data-mode="raster">高品質画像</button>
+        </div>
+      </div>
+      <button class="tb-btn icon" id="themeToggle">◐</button>
+    </div>
+  </header>
+  <div class="workspace">
+    <aside class="toolrail" id="toolrail">
+      <button class="tool active" data-tool="select">選択</button>
+      <button class="tool" data-tool="text">文字</button>
+      <button class="tool" data-tool="rect">四角</button>
+      <button class="tool" data-tool="ellipse">丸</button>
+      <button class="tool" data-tool="line">線</button>
+      <button class="tool" data-tool="image">画像</button>
+      <div class="toolrail-spacer"></div>
+      <button class="tool" data-tool="help" id="helpBtn">ヘルプ</button>
+    </aside>
+    <main class="canvas-wrap" id="canvasWrap"><div class="canvas" id="canvas"></div></main>
+    <aside class="inspector" id="inspector"></aside>
+  </div>
+  <footer class="statusbar">
+    <div class="sb-left"><button class="sb-btn" id="addPageBtn">＋ ページ</button><span class="sb-info" id="pageInfo">1 / 1</span></div>
+    <div class="sb-center"><span class="sb-hint" id="hint">hint</span></div>
+    <div class="sb-right">
+      <label class="sb-check"><input type="checkbox" id="snapChk" checked /> スナップ</label>
+      <button class="sb-btn" id="zoomOut">－</button><button class="sb-btn" id="zoomLevel">100%</button><button class="sb-btn" id="zoomIn">＋</button>
+    </div>
+  </footer>
+  <input type="file" id="imageInput" hidden />
+  <input type="file" id="jsonInput" hidden />
+  <div id="toast" class="toast" hidden></div>
+  <div id="overlay" class="overlay" hidden></div>
+
+  <!-- test output（dump-dom で読む） -->
+  <pre id="RESULTS" style="position:fixed;left:8px;bottom:48px;z-index:9999;background:#000;color:#0f0;font:11px monospace;padding:8px;max-width:520px;white-space:pre-wrap"></pre>
+  <pre id="PDF_AUTO" style="display:none"></pre>
+
+  <script src="../pdfwriter.js"></script>
+  <script src="../app.js"></script>
+  <script>
+  (function () {
+    var log = [], pass = 0, fail = 0;
+    function ok(c, m) { if (c) { pass++; log.push('PASS ' + m); } else { fail++; log.push('FAIL ' + m); } }
+
+    function run() {
+      var K = window.kami;
+      ok(!!K, 'window.kami API exists');
+      K.reset();
+
+      // 1ページ目: 欧文テキスト + 図形（ベクター対象）
+      K.addElement('text', { x: 40, y: 60, w: 460, h: 120, size: 28, bold: true, color: '#11213a',
+        text: 'Invoice #2026-07\nThank you for your business.' });
+      K.addElement('rect', { x: 40, y: 220, w: 300, h: 90, fill: '#dbe4ff', stroke: '#3b4a6b', strokeWidth: 2, radius: 10 });
+      K.addElement('ellipse', { x: 380, y: 220, w: 120, h: 120, fill: '#ffe0e6' });
+      K.addElement('line', { x: 40, y: 360, w: 460, h: 2, stroke: '#c23a56', strokeWidth: 3, dir: '\\' });
+      K.addElement('text', { x: 40, y: 400, w: 460, h: 60, size: 13, color: '#444',
+        text: 'This is a long paragraph that should wrap across multiple lines within the fixed text box width so we can verify word wrapping works correctly.' });
+
+      // 2ページ目: 日本語（ラスタ対象）。選択を外してから対象ページを指定する
+      K.addPage('a4');
+      K.select(null);
+      K.state.currentPage = 1;
+      K.addElement('text', { x: 50, y: 80, w: 480, h: 200, size: 24, color: '#111',
+        text: '請求書\n日本語のテキストも綺麗に出力されます。' });
+      K.select(null);
+
+      var d = K.getDoc();
+      ok(d.pages.length === 2, 'doc has 2 pages');
+      ok(d.pages[0].els.length === 5, 'page1 has 5 elements (got ' + d.pages[0].els.length + ')');
+      ok(d.pages[1].els.length === 1, 'page2 has 1 element');
+
+      // テキスト折返し（実 measureText 経由）
+      var wideEl = d.pages[0].els[4];
+      var lay = K.layoutText(wideEl);
+      ok(lay.lines.length >= 2, 'long text wraps into >=2 lines (got ' + lay.lines.length + ')');
+      // 各行が箱幅に収まっている
+      var allFit = lay.lines.every(function (ln) { return ln.width <= wideEl.w + 1; });
+      ok(allFit, 'every wrapped line fits within box width');
+
+      // raster 判定
+      ok(K.pageNeedsRaster(d.pages[0]) === false, 'english page -> vector');
+      ok(K.pageNeedsRaster(d.pages[1]) === true, 'japanese page -> raster');
+
+      // ベクターops
+      var ops = K.buildVectorOps(d.pages[0]);
+      var kinds = {}; ops.forEach(function (o) { kinds[o.type] = (kinds[o.type] || 0) + 1; });
+      ok(kinds.rect >= 1 && kinds.ellipse === 1 && kinds.line >= 1 && kinds.text >= 3,
+        'vector ops present: ' + JSON.stringify(kinds));
+
+      // 書き出し3モード
+      var auto = K.exportBase64('auto');
+      ok(auto.vectorCount === 1 && auto.rasterCount === 1, 'auto: 1 vector + 1 raster (' + JSON.stringify(auto) + ')');
+      var vec = K.exportBase64('vector');
+      ok(vec.vectorCount === 2 && vec.rasterCount === 0, 'vector: 2 vector pages');
+      var ras = K.exportBase64('raster');
+      ok(ras.rasterCount === 2 && ras.vectorCount === 0, 'raster: 2 raster pages');
+
+      ok(auto.b64.length > 500 && atob(auto.b64.slice(0, 12)).indexOf('%PDF-1.7') === 0, 'auto pdf starts with %PDF-1.7');
+      document.getElementById('PDF_AUTO').textContent = auto.b64;
+
+      // Undo/redo
+      var before = K.getDoc().pages[0].els.length;
+      K.select(K.getDoc().pages[0].els[0].id);
+      // 直接 doc 操作は履歴に乗らないので、UI 経由の undo は別途。ここでは API 健全性のみ。
+      ok(typeof K.undo === 'function' && typeof K.redo === 'function', 'undo/redo callable');
+
+      // DOM レンダリング健全性
+      ok(document.querySelectorAll('.sheet').length === 2, 'DOM renders 2 sheets');
+      ok(document.querySelectorAll('.el').length >= 6, 'DOM renders elements');
+
+      var summary = 'RESULT ' + pass + ' passed, ' + fail + ' failed\n' + log.join('\n');
+      document.getElementById('RESULTS').textContent = summary;
+      document.title = 'KAMI_TEST ' + pass + '/' + (pass + fail) + (fail ? ' FAIL' : ' OK');
+      window.__DONE__ = true;
+    }
+    // app.js の init 後に実行
+    setTimeout(run, 500);
+  })();
+  </script>
+</body>
+</html>

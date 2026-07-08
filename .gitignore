@@ -1,0 +1,11 @@
+# テスト実行時に生成される成果物
+test/out.pdf
+test/dumpdom.html
+test/shot.png
+test/*.jpg
+test/auto_from_browser.pdf
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# 紙 (kami) ランチャー — WSL から Windows の既定ブラウザで開きます
+set -e
+DIR="$(cd "$(dirname "$0")" && pwd)"
+HTML="$DIR/index.html"
+
+if command -v wslpath >/dev/null 2>&1 && command -v cmd.exe >/dev/null 2>&1; then
+  WINPATH="$(wslpath -w "$HTML")"
+  echo "📄 kami を開いています: $WINPATH"
+  cmd.exe /c start "" "$WINPATH" >/dev/null 2>&1
+elif command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "$HTML"
+elif command -v open >/dev/null 2>&1; then
+  open "$HTML"
+else
+  echo "ブラウザで開いてください: file://$HTML"
+fi

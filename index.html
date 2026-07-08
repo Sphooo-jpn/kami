@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#e11d48" />
+  <title>紙 — kami · PDF WYSIWYG editor</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" title="紙 — 依存ゼロの PDF WYSIWYG エディタ">紙<span class="brand-sub">kami</span></div>
+
+    <input id="docTitle" class="doc-title" type="text" spellcheck="false"
+           value="無題のドキュメント" aria-label="ドキュメント名" />
+
+    <div class="topbar-actions">
+      <button class="tb-btn" id="undoBtn" title="元に戻す (Ctrl+Z)" disabled>↺</button>
+      <button class="tb-btn" id="redoBtn" title="やり直し (Ctrl+Shift+Z)" disabled>↻</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="newBtn" title="新規">新規</button>
+      <button class="tb-btn" id="openBtn" title="開く (.kami.json)">開く</button>
+      <button class="tb-btn" id="saveBtn" title="保存 (.kami.json)">保存</button>
+      <span class="tb-sep"></span>
+      <div class="menu-wrap">
+        <button class="tb-btn primary" id="exportBtn" title="PDF に書き出す">PDF 書き出し ▾</button>
+        <div class="menu" id="exportMenu" hidden>
+          <button data-mode="auto"><b>スマート書き出し</b><small>欧文は選択可能なベクター・日本語ページは高品質画像</small></button>
+          <button data-mode="vector"><b>ベクター（軽量）</b><small>文字を選択可能に・欧文向け</small></button>
+          <button data-mode="raster"><b>高品質画像</b><small>全ページを画像化・完全な見た目再現</small></button>
+        </div>
+      </div>
+      <span class="tb-sep"></span>
+      <button class="tb-btn icon" id="themeToggle" title="テーマ切り替え">◐</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="toolrail" id="toolrail" role="toolbar" aria-label="ツール">
+      <button class="tool active" data-tool="select" title="選択 / 移動 (V)">
+        <svg viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></svg><span>選択</span>
+      </button>
+      <button class="tool" data-tool="text" title="テキスト (T)">
+        <svg viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M8 19h8" fill="none" stroke-width="2"/></svg><span>文字</span>
+      </button>
+      <button class="tool" data-tool="rect" title="長方形 (R)">
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke-width="2"/></svg><span>四角</span>
+      </button>
+      <button class="tool" data-tool="ellipse" title="楕円 (O)">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="6" fill="none" stroke-width="2"/></svg><span>丸</span>
+      </button>
+      <button class="tool" data-tool="line" title="直線 (L)">
+        <svg viewBox="0 0 24 24"><path d="M5 19L19 5" fill="none" stroke-width="2"/></svg><span>線</span>
+      </button>
+      <button class="tool" data-tool="image" title="画像 (I)">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke-width="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l4-4 3 3 3-4 4 5" fill="none" stroke-width="2"/></svg><span>画像</span>
+      </button>
+      <div class="toolrail-spacer"></div>
+      <button class="tool" data-tool="help" id="helpBtn" title="使い方 / ショートカット">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 113.6 2.2c-.8.4-1.1 1-1.1 1.8M12 17h.01" fill="none" stroke-width="2"/></svg><span>ヘルプ</span>
+      </button>
+    </aside>
+
+    <main class="canvas-wrap" id="canvasWrap">
+      <div class="canvas" id="canvas"></div>
+    </main>
+
+    <aside class="inspector" id="inspector"></aside>
+  </div>
+
+  <footer class="statusbar">
+    <div class="sb-left">
+      <button class="sb-btn" id="addPageBtn" title="ページを追加">＋ ページ</button>
+      <span class="sb-info" id="pageInfo">1 / 1</span>
+    </div>
+    <div class="sb-center">
+      <span class="sb-hint" id="hint">ツールを選んでページ上をドラッグ / 要素をダブルクリックで文字入力</span>
+    </div>
+    <div class="sb-right">
+      <label class="sb-check"><input type="checkbox" id="snapChk" checked /> スナップ</label>
+      <button class="sb-btn" id="zoomOut" title="縮小">－</button>
+      <button class="sb-btn" id="zoomLevel" title="フィット">100%</button>
+      <button class="sb-btn" id="zoomIn" title="拡大">＋</button>
+    </div>
+  </footer>
+
+  <input type="file" id="imageInput" accept="image/*" hidden />
+  <input type="file" id="jsonInput" accept=".json,application/json" hidden />
+  <div id="toast" class="toast" hidden></div>
+  <div id="overlay" class="overlay" hidden></div>
+
+  <script src="pdfwriter.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
