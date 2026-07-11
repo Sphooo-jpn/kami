@@ -58,6 +58,8 @@
 }
 
 * { box-sizing: border-box; }
+/* hidden 属性は常に最優先で隠す（.overlay 等の display 指定に打ち消されないように） */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
